@@ -1,263 +1,275 @@
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "lista.h"
+#include "lista.h" 
 
-typedef struct Nodo{
+typedef struct Node {
     int data;
-    struct Nodo *sig;
-} Nodo;
+    struct Node *next;
+} Node;
 
-struct Lista{
-    Nodo *cabeza;
-    Nodo *cola;
+struct List {
+    Node *head;
+    Node *tail;
     size_t size;
 };
 
-/*vida util*/
-Lista *lista_create(void){
-    Lista *l = malloc(sizeof(Lista));
-    if(!l)return NULL;
+/* Lifespan / Memory Management */
+List *list_create(void) {
+    List *l = malloc(sizeof(List));
+    if (!l) return NULL;
 
-    l->cabeza = NULL;
-    l->cola = NULL;
+    l->head = NULL;
+    l->tail = NULL;
     l->size = 0;
 
     return l;
 }
 
-void lista_destroy(Lista *l){
-    if(!l)return;
+void list_clear(List *l) {
+    if (!l) return;
 
-    Nodo *actual = l->cabeza;
-
-    while (actual) {
-        Nodo *next = actual->sig;
-        free(actual);
-        actual = next;
+    Node *current = l->head;
+    while (current) {
+        Node *next = current->next;
+        free(current);
+        current = next;
     }
+
+    l->head = NULL;
+    l->tail = NULL;
+    l->size = 0;
+}
+
+void list_destroy(List *l) {
+    if (!l) return;
+
+    list_clear(l);
     free(l);
 }
 
-/*acceso*/
-size_t lista_size(const Lista *l){
+/* Accessors */
+size_t list_size(const List *l) {
     return l ? l->size : 0;
 }
 
-int lista_empty(const Lista *l){
-    return (!l || !l->cabeza) ? 1 : 0;
+int list_empty(const List *l) {
+    return (!l || !l->head) ? 1 : 0;
 }
 
-int lista_front(const Lista *l, int *valor){
-    if(!l || !l->cabeza || !valor)return -1;
-    *valor = l->cabeza->data;
+int list_front(const List *l, int *out) {
+    if (!l || !l->head || !out) return -1;
+
+    *out = l->head->data;
     return 0;
 }
 
-int lista_back(const Lista *l, int *valor){
-    if(!l || !l->cabeza || !valor)return -1;
-    *valor = l->cola->data;
+int list_back(const List *l, int *out) {
+    if (!l || !l->head || !out) return -1;
+
+    *out = l->tail->data;
     return 0;
 }
 
-int lista_get(const Lista *l, size_t pos, int *valor){
-    if(!l || pos >= l->size || !valor)return -1;
+int list_get(const List *l, size_t pos, int *out) {
+    if (!l || !l->head || !out || pos >= l->size) return -1;
 
-    Nodo *actual = l->cabeza;
-
+    Node *current = l->head;
     for (size_t i = 0; i < pos; i++) {
-        actual = actual->sig;
+        current = current->next;
     }
-
-    *valor = actual->data;
-
+    
+    *out = current->data;
     return 0;
 }
 
-/*insert*/
-int lista_push_front(Lista *l, int valor){
-    if(!l)return -1;
-    
-    Nodo *nuevo = malloc(sizeof(Nodo));
-    if(!nuevo)return -1;
+/* Insertion */
+int list_push_front(List *l, int value) {
+    if (!l) return -1;
 
+    Node *new_node = malloc(sizeof(Node));
+    if (!new_node) return -1;
 
-    nuevo->data = valor;
-    nuevo->sig = l->cabeza;
-    l->cabeza = nuevo;
-    
-    if(!l->size){
-        l->cola = nuevo;
+    new_node->data = value;
+    new_node->next = l->head;
+    l->head = new_node;
+
+    if (!l->size) {
+        l->tail = new_node;
     }
-
+    
     l->size++;
     return 0;
 }
 
-int lista_push_back(Lista *l, int valor){
-    if(!l)return -1;
+int list_push_back(List *l, int value) {
+    if (!l) return -1;
 
-    Nodo *nuevo = malloc(sizeof(Nodo));
-    if(!nuevo)return -1;
+    Node *new_node = malloc(sizeof(Node));
+    if (!new_node) return -1;
 
+    new_node->data = value;
+    new_node->next = NULL;
 
-    nuevo->data = valor;
-    nuevo->sig = NULL;
-
-    if (!l->cabeza) {
-        l->cabeza = nuevo;
-        l->cola = nuevo;
+    if (!l->head) {
+        l->head = new_node;
+        l->tail = new_node;
         l->size++;
         return 0;
     }
-
-    l->cola->sig = nuevo;
-    l->cola = nuevo;
+    
+    l->tail->next = new_node;
+    l->tail = new_node;
     l->size++;
-
     return 0;
 }
 
-int lista_insert_at(Lista *l, size_t pos, int valor){
-    if(!l || pos > l->size)return -1;
-    
-    /* 1- interceptar casos frontera*/
+int list_insert_at(List *l, size_t pos, int value) {
+    if (!l || pos > l->size) return -1;
+
+    /* 1. Handle edge cases */
     if (pos == 0) {
-        lista_push_front(l, valor);
-        return 0;
+        return list_push_front(l, value);
     }
 
     if (pos == l->size) {
-        lista_push_back(l, valor);
-        return 0;
+        return list_push_back(l, value);
     }
+    
+    /* 2. Middle insertion (O(n)) */
+    Node *new_node = malloc(sizeof(Node));
+    if (!new_node) return -1;
 
-    /* 2- la insercion debe ser en el medio O(n)*/
-    Nodo *nuevo = malloc(sizeof(Nodo));
-    if(!nuevo)return -1;
+    new_node->data = value;
 
-    nuevo->data = valor;
-
-    /* 3- buscar el nodo anterior a la posicion deseada*/
-    Nodo *anterior = l->cabeza;
-
-    for (size_t i = 0; i < pos -1; i++) {
-        anterior = anterior->sig;
+    /* 3. Find previous node */
+    Node *prev = l->head;
+    for (size_t i = 0; i < pos - 1; i++) {
+        prev = prev->next;
     }
-
-    /* 4- cirujia de punteros*/
-    nuevo->sig = anterior->sig;
-    anterior->sig = nuevo;
+    
+    /* 4. Pointer manipulation */
+    new_node->next = prev->next;
+    prev->next = new_node;
 
     l->size++;
-
-    return 0;
-}   
-
-/*eliminar*/
-int lista_pop_front(Lista *l, int *out){
-    if(!l || !l->cabeza || !out)return -1;
-
-    Nodo *temp = l->cabeza;
-    *out = l->cabeza->data;
-    l->cabeza = temp->sig;
-    free(temp);
-
-    if (!l->cabeza) {
-        l->cola = NULL;
-    }
-
-    l->size--;
-
     return 0;
 }
 
-int lista_pop_back(Lista *l, int *out){
-    if(!l || !l->cabeza || !out)return -1;
+/* Deletion */
+int list_pop_front(List *l, int *out) {
+    if (!l || !l->head || !out) return -1;
 
-    /*un solo nodo*/
-    if (!l->cabeza->sig) {
-        *out = l->cabeza->data;
-        free(l->cabeza);
-        l->cabeza = NULL;
-        l->cola = NULL;
+    *out = l->head->data;
+
+    Node *temp = l->head;
+    l->head = temp->next;
+
+    if (!l->head) {
+        l->tail = NULL;
+    }
+
+    free(temp);
+    l->size--;
+    
+    return 0;
+}
+
+int list_pop_back(List *l, int *out) {
+    if (!l || !l->head || !out) return -1;
+
+    *out = l->tail->data;
+
+    /* Case: Only one node in the list */
+    if (!l->head->next) {
+        free(l->head);
+        l->head = NULL;
+        l->tail = NULL;
         l->size--;
         return 0;
     }
 
-    /*mas de un nodo. Buscar el penultimo*/
-    Nodo *actual = l->cabeza;
-    
-    while (actual->sig != l->cola) {
-        actual = actual->sig;    
+    /* Case: Multiple nodes in the list. Find the second-to-last node */
+    Node *penultimate = l->head;
+    while (penultimate->next != l->tail) {
+        penultimate = penultimate->next;
     }
-
-    /*actual es ahora el penultimo nodo*/
-    *out = l->cola->data;
-    free(l->cola);
-    l->cola = actual;
-    l->cola->sig = NULL;
+    
+    free(l->tail);
+    l->tail = penultimate;
+    l->tail->next = NULL;
     l->size--;
 
     return 0;
 }
 
-int lista_remove(Lista *l, int valor){
-    if(!l || !l->cabeza)return -1;
+int list_remove(List *l, int value, int *out) {
+    if (!l || !l->head || !out) return -1;
 
-    /* 1- casos frontera*/
-    if (l->cabeza->data == valor) {
-        return lista_pop_front(l, &valor);
+    /* 1. Handle edge cases */
+    if (l->head->data == value) {
+        return list_pop_front(l, out);
     }
-
-    if (l->cola->data == valor) {
-        return lista_pop_back(l, &valor);
-    }
-
-    /* 2- se encuentra en medio*/
-    Nodo *anterior = l->cabeza;
-    Nodo *actual = l->cabeza->sig;
     
-    while (actual) {
-        if (actual->data == valor) {
-            anterior->sig = actual->sig;
-            free(actual);
-            l->size--;
+    if (l->tail->data == value) {
+        return list_pop_back(l, out);
+    }
+    
+    /* 2. Middle deletion */
+    Node *current = l->head->next;
+    Node *prev = l->head;
 
+    while (current) {
+        if (current->data == value) {
+            *out = current->data;
+            prev->next = current->next;
+            free(current);
+            l->size--;
             return 0;
         }
-        anterior = actual;
-        actual = actual->sig;
+        prev = current;
+        current = current->next;
     }
-    return -1;
+    
+    return -1; /* Value not found in the list */
 }
 
-/*modificar*/
-int lista_reverse(Lista *l){
-    if(!l || l->size < 2)return -1;
+/* Operations */
+int list_reverse(List *l) {
+    if (!l) return -1;
 
-    Nodo *anterior = NULL;
-    Nodo *actual = l->cabeza;
-    Nodo *next = NULL;
+    Node *prev = NULL;
+    Node *current = l->head;
+    Node *next = NULL;
 
-    /*guardar antigua cabeza porque al final se convertira en la nueva cola*/
-    Nodo *nueva_cabeza = l->cabeza;
+    /* Save current head, which will become the new tail */
+    Node *old_head = l->head;
 
-    while (actual) {
-        /* 1- guardar el futuro, no se puede perder el resto de la lista*/
-        next = actual->sig;
+    while (current) {
+        /* Save next link so we don't lose the list references */
+        next = current->next;
 
-        /* 2- Invertir enlace. Ahora apuntar hacia atras*/
-        actual->sig = anterior;
+        /* Reverse link direction */
+        current->next = prev;
 
-        /* 3- avanzar el tren, mover el puntero un paso*/
-        anterior = actual;
-        actual = next;
+        /* Advance the pointers one step */
+        prev = current;
+        current = next;
     }
-
-    /*al salir del bucle anterior quedo parado en el ultimo nodo de la lista*/
-    l->cabeza = anterior;   
-    l->cola = nueva_cabeza;
+    
+    l->head = prev;
+    l->tail = old_head;
 
     return 0;
+}
+
+/* Utilities / Printing */
+void list_print(const List *l) {
+    if (!l) return;
+
+    Node *current = l->head;
+    while (current) {
+        printf("%d -> ", current->data);
+        current = current->next;
+    }
+    printf("NULL\n");
 }
